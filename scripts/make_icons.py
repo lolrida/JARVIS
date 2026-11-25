@@ -4,7 +4,9 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFilter
 
-OUT = Path(__file__).resolve().parent.parent / "jarvis" / "static" / "app" / "icons"
+ROOT = Path(__file__).resolve().parent.parent
+OUT = ROOT / "jarvis" / "static" / "app" / "icons"
+ASSETS = ROOT / "ios" / "JARVIS" / "Assets.xcassets"
 S = 1024  # draw large, then downsample for smooth edges
 BG = (11, 17, 28)
 CYAN = (88, 196, 255)
@@ -38,7 +40,10 @@ def main() -> None:
     m = Image.new("RGB", (S, S), BG)
     m.paste(big.resize((int(S * 0.8),) * 2, Image.LANCZOS), (int(S * 0.1),) * 2)
     m.resize((512, 512), Image.LANCZOS).save(OUT / "icon-maskable-512.png", optimize=True)
-    print("wrote", sorted(p.name for p in OUT.iterdir()))
+    # Native iOS app: one 1024px icon (RGB, no transparency, as the App Store requires) and an in-app logo.
+    big.save(ASSETS / "AppIcon.appiconset" / "icon-1024.png", optimize=True)
+    big.resize((256, 256), Image.LANCZOS).save(ASSETS / "Logo.imageset" / "logo.png", optimize=True)
+    print("wrote icons")
 
 
 if __name__ == "__main__":
