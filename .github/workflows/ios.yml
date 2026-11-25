@@ -1,5 +1,10 @@
 name: iOS app
 
+# Builds the iPhone app on a GitHub-hosted Mac, so you don't need one.
+# Produces an unsigned JARVIS.ipa you can download (Actions tab -> latest run -> Artifacts)
+# and install from Windows or a Mac with Sideloadly or AltStore. See the README.
+# Run it by hand from the Actions tab with "Run workflow", or it runs on every change to ios/.
+
 on:
   push:
     paths: ["ios/**", ".github/workflows/ios.yml"]
@@ -9,27 +14,44 @@ on:
 
 jobs:
   build:
-    name: Build (iOS Simulator, unsigned)
+    name: Build JARVIS.ipa
     runs-on: macos-15
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+
       - name: Show Xcode
         run: xcodebuild -version
-      - name: Build
+
+      - name: Build for iPhone (unsigned)
         run: |
           xcodebuild build \
             -project ios/JARVIS.xcodeproj \
             -target JARVIS \
-            -configuration Debug \
-            -sdk iphonesimulator \
-            CODE_SIGNING_ALLOWED=NO > build.log 2>&1
+            -configuration Release \
+            -sdk iphoneos \
+            SYMROOT="$PWD/build" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" > build.log 2>&1
           status=$?
           echo "---- errors and warnings ----"
           grep -E "(error|warning):" build.log | sort -u | head -150 || true
           echo "---- tail ----"
-          tail -20 build.log
+          tail -5 build.log
           exit $status
+
+      - name: Package JARVIS.ipa
+        run: |
+          mkdir -p out/Payload
+          cp -R build/Release-iphoneos/JARVIS.app out/Payload/
+          cd out && zip -qry JARVIS.ipa Payload && ls -lh JARVIS.ipa
+
+      - name: Upload JARVIS.ipa
+        uses: actions/upload-artifact@v4
+        with:
+          name: JARVIS-ipa
+          path: out/JARVIS.ipa
+          retention-days: 90
+
       - name: Upload build log
         if: always()
         uses: actions/upload-artifact@v4

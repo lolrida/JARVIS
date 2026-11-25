@@ -39,6 +39,10 @@ Open **http://localhost:8000**, paste the key, then:
 `restart: unless-stopped` brings everything back after crashes and reboots. Using an NVIDIA GPU? Uncomment the
 `deploy:` block in `docker-compose.yml`.
 
+Running the server on **Windows**: install [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+and use the same command in PowerShell from the `JARVIS` folder. NVIDIA GPUs work through WSL 2 with the
+`deploy:` block uncommented.
+
 ### Without Docker
 
 ```bash
@@ -59,27 +63,41 @@ jarvis serve            # http://localhost:8000 ; admin key printed and saved to
   (optionally learning from your 👍 replies), and download base models to the server with a progress bar
 - API key kept in the iOS Keychain; light and dark mode; haptics; Dynamic Type
 
-### Put it on your iPhone
+### Put it on your iPhone from Windows (no Mac needed)
 
-You need a Mac with Xcode 16 or newer (free from the Mac App Store) and a USB cable.
+GitHub builds the app for you on one of its Macs; you install it from your Windows PC with a free tool.
 
-1. Open `ios/JARVIS.xcodeproj` in Xcode.
+1. **Get the app file.** On github.com, open this repository → **Actions** → **iOS app**. Open the latest
+   green run (or click **Run workflow** to start one, about 4 minutes), then download **JARVIS-ipa**
+   under *Artifacts*. Unzip it to get `JARVIS.ipa`.
+2. **Install a sideloading tool on the PC**, either:
+   - [Sideloadly](https://sideloadly.io): simplest. Plug in the iPhone, drag `JARVIS.ipa` into Sideloadly,
+     enter your Apple ID, press **Start**.
+   - [AltStore](https://altstore.io) (AltServer for Windows): a bit more setup, but it can **re-sign the app
+     automatically over Wi-Fi** while your PC is on, so you don't have to redo it every week.
+
+   Both may ask you to install iTunes and iCloud from Apple's website (not the Microsoft Store versions).
+   A free Apple ID works; consider making a separate one just for this.
+3. **On the iPhone**, the first time: Settings → Privacy & Security → turn on **Developer Mode** (the phone
+   restarts), then Settings → General → **VPN & Device Management** → trust your Apple ID.
+4. Open JARVIS, enter your server address and an API key (`jarvis create-key --name iphone`).
+
+### Put it on your iPhone from a Mac
+
+1. Open `ios/JARVIS.xcodeproj` in Xcode 16 or newer.
 2. Click the **JARVIS** target → **Signing & Capabilities** → **Team** → add your Apple ID and pick it.
    Change **Bundle Identifier** from `com.yourname.jarvis` to something unique, e.g. `com.<yourname>.jarvis`.
-3. Plug in your iPhone, select it at the top of Xcode, and press **Run** (▶).
-   The first time, iOS asks you to turn on **Developer Mode** (Settings → Privacy & Security), and to trust
-   your developer certificate (Settings → General → VPN & Device Management).
-4. In the app, enter your server address (e.g. `192.168.1.20:8000`, or your Tailscale `https://…ts.net` address)
-   and an API key (`jarvis create-key --name iphone`).
+3. Plug in your iPhone, select it at the top of Xcode, and press **Run** (▶). Developer Mode and trusting the
+   developer work the same as step 3 above.
 
-**About Apple's rules (honest version):**
-- With a **free Apple ID**, apps you install yourself stop opening after **7 days**. Plug in and press Run again
-  to renew; your chats and settings are kept.
-- A paid **Apple Developer Program** membership ($99/year) makes installs last a year and lets you use
-  TestFlight to install over the air, or share with others.
-- Publishing on the App Store is possible but needs that membership and Apple's review.
+### Apple's rules (honest version)
 
-GitHub Actions compiles the app on macOS on every change to `ios/` (`.github/workflows/ios.yml`), so the code in the repo is known to build.
+- With a **free Apple ID**, apps you install yourself stop opening after **7 days**. Re-install (Sideloadly or
+  Xcode) or let AltStore refresh it; your chats and settings are kept. Free IDs can have at most 3 such apps at once.
+- A paid **Apple Developer Program** membership ($99/year) makes installs last a year and allows TestFlight,
+  which installs over the air with no PC at all. GitHub Actions can build and upload to TestFlight for you;
+  it needs that membership plus signing keys stored as repository secrets.
+- Publishing on the App Store needs the same membership and Apple's review.
 
 ### Reaching your server from the phone
 
@@ -88,10 +106,10 @@ GitHub Actions compiles the app on macOS on every change to `ios/` (`.github/wor
   then on the server run `tailscale serve --bg 8000`. It prints an `https://<machine>.<tailnet>.ts.net` address
   that only your devices can open.
 
-### No Mac?
+### No sideloading at all?
 
 The server also serves a web version of the app at `/app`. Open it in Safari on the iPhone and use
-**Share → Add to Home Screen**. No Xcode, no Apple account, no 7-day limit.
+**Share → Add to Home Screen**. No PC tools, no Apple account, no 7-day limit.
 
 ## Using your models from code
 
