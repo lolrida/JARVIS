@@ -17,6 +17,8 @@ jobs:
     name: Build JARVIS.ipa
     runs-on: macos-15
     timeout-minutes: 30
+    permissions:
+      contents: write   # to publish JARVIS.ipa on the "ios-latest" release
     steps:
       - uses: actions/checkout@v4
 
@@ -51,6 +53,21 @@ jobs:
           name: JARVIS-ipa
           path: out/JARVIS.ipa
           retention-days: 90
+
+      - name: Publish to the "ios-latest" release (direct download link, no login needed)
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view ios-latest --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/ios-latest" -f sha="$GITHUB_SHA" -F force=true >/dev/null
+          else
+            gh release create ios-latest --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
+              --title "JARVIS iPhone app (latest build)" \
+              --notes "Unsigned build of the JARVIS iPhone app, updated automatically on every change. Install it with Sideloadly or AltStore: see the README."
+          fi
+          gh release upload ios-latest out/JARVIS.ipa --repo "$GITHUB_REPOSITORY" --clobber
+          echo "Download: https://github.com/$GITHUB_REPOSITORY/releases/download/ios-latest/JARVIS.ipa"
 
       - name: Upload build log
         if: always()

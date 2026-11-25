@@ -22,6 +22,20 @@ cost nothing, and the models are free open-weight downloads. What still costs so
 - **Training** (true fine-tuning) needs a decent GPU. You can borrow one for free for short sessions
   (Google Colab / Kaggle free tiers), then bring the weights home — see [Fine-tuning](#fine-tuning-your-own-weights).
 
+## Windows: one-command install
+
+Open **PowerShell** and paste:
+
+```powershell
+irm https://raw.githubusercontent.com/lolrida/JARVIS/claude/custom-ai-hosting-platform-z6h61i/install-windows.ps1 | iex
+```
+
+It installs and starts Docker Desktop if needed, downloads and starts JARVIS (24/7), creates your admin
+key and an iPhone key, opens port 8000 for your home network, downloads a starter model and creates your
+own `jarvis` model, downloads the iPhone app (`JARVIS.ipa`) to your Desktop, and saves every credential to
+**`JARVIS - credenziali.txt`** on your Desktop. Run it again any time to update; nothing is lost.
+If Docker Desktop had to be installed, restart the PC once and run the command again.
+
 ## Quick start (Docker — recommended for 24/7)
 
 ```bash
@@ -67,9 +81,8 @@ jarvis serve            # http://localhost:8000 ; admin key printed and saved to
 
 GitHub builds the app for you on one of its Macs; you install it from your Windows PC with a free tool.
 
-1. **Get the app file.** On github.com, open this repository → **Actions** → **iOS app**. Open the latest
-   green run (or click **Run workflow** to start one, about 4 minutes), then download **JARVIS-ipa**
-   under *Artifacts*. Unzip it to get `JARVIS.ipa`.
+1. **Get the app file:** the Windows installer puts `JARVIS.ipa` on your Desktop, or download it directly from
+   <https://github.com/lolrida/JARVIS/releases/download/ios-latest/JARVIS.ipa>. GitHub rebuilds it on every change.
 2. **Install a sideloading tool on the PC**, either:
    - [Sideloadly](https://sideloadly.io): simplest. Plug in the iPhone, drag `JARVIS.ipa` into Sideloadly,
      enter your Apple ID, press **Start**.

@@ -1,0 +1,59 @@
+name: Windows installer
+
+on:
+  push:
+    paths: ["install-windows.ps1", ".github/workflows/windows.yml"]
+  pull_request:
+    paths: ["install-windows.ps1", ".github/workflows/windows.yml"]
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Parse with Windows PowerShell 5.1 (what most PCs have)
+        shell: powershell
+        run: |
+          $errors = $null
+          [void][System.Management.Automation.Language.Parser]::ParseFile("$PWD\install-windows.ps1", [ref]$null, [ref]$errors)
+          if ($errors) { $errors | ForEach-Object { Write-Host $_ }; exit 1 }
+          Write-Host "PowerShell 5.1: no syntax errors"
+
+      - name: Parse with PowerShell 7
+        shell: pwsh
+        run: |
+          $errors = $null
+          [void][System.Management.Automation.Language.Parser]::ParseFile("$PWD/install-windows.ps1", [ref]$null, [ref]$errors)
+          if ($errors) { $errors | ForEach-Object { Write-Host $_ }; exit 1 }
+          Write-Host "PowerShell 7: no syntax errors"
+
+      - name: PSScriptAnalyzer (errors fail the build)
+        shell: pwsh
+        run: |
+          Install-Module PSScriptAnalyzer -Force -Scope CurrentUser
+          $results = Invoke-ScriptAnalyzer -Path install-windows.ps1 -ExcludeRule PSAvoidUsingWriteHost
+          $results | Format-Table -AutoSize | Out-String -Width 200 | Write-Host
+          if ($results | Where-Object Severity -eq 'Error') { exit 1 }
+
+      - name: Check the Windows networking commands it relies on exist
+        shell: powershell
+        run: |
+          foreach ($c in 'Get-NetRoute','Get-NetIPAddress','Get-NetFirewallRule','New-NetFirewallRule','Get-NetConnectionProfile','Expand-Archive') {
+            if (-not (Get-Command $c -ErrorAction SilentlyContinue)) { Write-Host "missing: $c"; exit 1 }
+          }
+          $route = Get-NetRoute -DestinationPrefix '0.0.0.0/0' | Sort-Object RouteMetric | Select-Object -First 1
+          $ip = (Get-NetIPAddress -InterfaceIndex $route.ifIndex -AddressFamily IPv4 | Select-Object -First 1).IPAddress
+          Write-Host "LAN IP detection works: $ip"
+
+      - name: Download step works (code zip)
+        shell: powershell
+        run: |
+          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+          $ProgressPreference = 'SilentlyContinue'
+          Invoke-WebRequest -Uri "https://github.com/${{ github.repository }}/archive/refs/heads/claude/custom-ai-hosting-platform-z6h61i.zip" -OutFile jarvis.zip -UseBasicParsing
+          Expand-Archive jarvis.zip -DestinationPath x -Force
+          $src = Get-ChildItem x -Directory | Select-Object -First 1
+          if (-not (Test-Path (Join-Path $src.FullName 'docker-compose.yml'))) { Write-Host "zip layout unexpected"; exit 1 }
+          Write-Host "Zip OK: $($src.Name)"
