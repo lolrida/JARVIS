@@ -47,28 +47,51 @@ pip install -e .
 jarvis serve            # http://localhost:8000 ; admin key printed and saved to ./data/admin_key.txt
 ```
 
-## iPhone app
+## iPhone app (native)
 
-JARVIS ships its own iPhone app at **`/app`**: chat with streaming replies, switch models and versions,
-👍 replies into your training data, dictate with the mic, have replies read aloud, and (with an admin key)
-switch versions, edit a model's personality, or download new base models straight from your phone.
-Chats are stored on the phone; replies come only from your server.
+`ios/` holds a native SwiftUI app for iPhone and iPad (iOS 17+):
 
-It's a web app you install from Safari. No App Store, no Apple developer account, no $99/year:
+- Chat with your models with live streaming replies, markdown and code blocks, and a stop button
+- Pick any model or pinned version from the title bar
+- Chat history saved on the phone; swipe to delete
+- Copy, read aloud, or 👍/👎 each reply (👍 conversations become training data)
+- With an admin key: switch or roll back versions, edit a model's personality and save it as a new version
+  (optionally learning from your 👍 replies), and download base models to the server with a progress bar
+- API key kept in the iOS Keychain; light and dark mode; haptics; Dynamic Type
 
-1. Make your server reachable from the phone (below).
-2. On the iPhone, open **`https://<your-server>/app`** in **Safari** and sign in with a key
-   (make one per device: API keys tab, or `jarvis create-key --name iphone`).
-3. Tap **Share → Add to Home Screen**. It now opens full-screen from its own icon like any other app.
+### Put it on your iPhone
 
-**Reaching your server from the phone**
+You need a Mac with Xcode 16 or newer (free from the Mac App Store) and a USB cable.
 
-- *Same Wi-Fi only:* `http://<computer's-local-IP>:8000/app` works.
+1. Open `ios/JARVIS.xcodeproj` in Xcode.
+2. Click the **JARVIS** target → **Signing & Capabilities** → **Team** → add your Apple ID and pick it.
+   Change **Bundle Identifier** from `com.yourname.jarvis` to something unique, e.g. `com.<yourname>.jarvis`.
+3. Plug in your iPhone, select it at the top of Xcode, and press **Run** (▶).
+   The first time, iOS asks you to turn on **Developer Mode** (Settings → Privacy & Security), and to trust
+   your developer certificate (Settings → General → VPN & Device Management).
+4. In the app, enter your server address (e.g. `192.168.1.20:8000`, or your Tailscale `https://…ts.net` address)
+   and an API key (`jarvis create-key --name iphone`).
+
+**About Apple's rules (honest version):**
+- With a **free Apple ID**, apps you install yourself stop opening after **7 days**. Plug in and press Run again
+  to renew; your chats and settings are kept.
+- A paid **Apple Developer Program** membership ($99/year) makes installs last a year and lets you use
+  TestFlight to install over the air, or share with others.
+- Publishing on the App Store is possible but needs that membership and Apple's review.
+
+GitHub Actions compiles the app on macOS on every change to `ios/` (`.github/workflows/ios.yml`), so the code in the repo is known to build.
+
+### Reaching your server from the phone
+
+- *Same Wi-Fi only:* use your computer's local IP and port, like `192.168.1.20:8000`. iOS asks once for local network permission.
 - *Anywhere, securely (recommended):* install [Tailscale](https://tailscale.com) (free) on the server and the iPhone,
   then on the server run `tailscale serve --bg 8000`. It prints an `https://<machine>.<tailnet>.ts.net` address
-  that only your devices can open. Use that + `/app`. HTTPS also enables the app's offline shell.
+  that only your devices can open.
 
-Updates ship with the server: pull the latest JARVIS, restart, and the phone picks up the new app the next time it opens.
+### No Mac?
+
+The server also serves a web version of the app at `/app`. Open it in Safari on the iPhone and use
+**Share → Add to Home Screen**. No Xcode, no Apple account, no 7-day limit.
 
 ## Using your models from code
 
