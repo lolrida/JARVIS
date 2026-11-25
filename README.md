@@ -47,6 +47,29 @@ pip install -e .
 jarvis serve            # http://localhost:8000 ; admin key printed and saved to ./data/admin_key.txt
 ```
 
+## iPhone app
+
+JARVIS ships its own iPhone app at **`/app`**: chat with streaming replies, switch models and versions,
+👍 replies into your training data, dictate with the mic, have replies read aloud, and (with an admin key)
+switch versions, edit a model's personality, or download new base models straight from your phone.
+Chats are stored on the phone; replies come only from your server.
+
+It's a web app you install from Safari. No App Store, no Apple developer account, no $99/year:
+
+1. Make your server reachable from the phone (below).
+2. On the iPhone, open **`https://<your-server>/app`** in **Safari** and sign in with a key
+   (make one per device: API keys tab, or `jarvis create-key --name iphone`).
+3. Tap **Share → Add to Home Screen**. It now opens full-screen from its own icon like any other app.
+
+**Reaching your server from the phone**
+
+- *Same Wi-Fi only:* `http://<computer's-local-IP>:8000/app` works.
+- *Anywhere, securely (recommended):* install [Tailscale](https://tailscale.com) (free) on the server and the iPhone,
+  then on the server run `tailscale serve --bg 8000`. It prints an `https://<machine>.<tailnet>.ts.net` address
+  that only your devices can open. Use that + `/app`. HTTPS also enables the app's offline shell.
+
+Updates ship with the server: pull the latest JARVIS, restart, and the phone picks up the new app the next time it opens.
+
 ## Using your models from code
 
 It speaks the OpenAI API, so most AI tools and SDKs work by changing the base URL:
@@ -110,7 +133,7 @@ Prompting, parameters and examples get you a long way. For a model that has trul
 ## Reaching it from anywhere
 
 Keep port 8000 off the public internet. Easiest safe option: install [Tailscale](https://tailscale.com) (free for personal use)
-on the server and your phone/laptop, then use `http://<server-tailscale-name>:8000` from anywhere.
+on the server and your phone/laptop, then `tailscale serve --bg 8000` gives you a private HTTPS address for it.
 If you must expose it publicly, put it behind HTTPS (e.g. Caddy or Cloudflare Tunnel) and keep keys secret.
 
 ## Configuration

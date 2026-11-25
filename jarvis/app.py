@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any, AsyncIterator
 
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, RedirectResponse, StreamingResponse
 
 from .backend import Backend, BackendError, OllamaBackend
 from .config import Settings
@@ -27,6 +27,7 @@ NAME_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,62}$")
 TAG_NS = "jarvis"
 BUNDLE_FORMAT = "jarvis-model/1"
 STATIC_DIR = Path(__file__).parent / "static"
+APP_DIR = STATIC_DIR / "app"
 
 # OpenAI request field -> Ollama option
 OPTION_MAP = {
@@ -132,6 +133,21 @@ def create_app(settings: Settings | None = None, backend: Backend | None = None)
     @app.get("/", include_in_schema=False)
     async def index():
         return FileResponse(STATIC_DIR / "index.html")
+
+    # ---- iPhone / mobile app (installable PWA) --------------------------------
+    @app.get("/app", include_in_schema=False)
+    async def mobile_redirect():
+        return RedirectResponse("/app/")
+
+    @app.get("/app/{path:path}", include_in_schema=False)
+    async def mobile_app(path: str):
+        target = (APP_DIR / (path or "index.html")).resolve()
+        if not target.is_relative_to(APP_DIR.resolve()) or not target.is_file():
+            raise HTTPException(404)
+        media = {".webmanifest": "application/manifest+json", ".js": "text/javascript"}.get(target.suffix)
+        # HTML, manifest and service worker must revalidate so app updates reach phones promptly.
+        cache = "public, max-age=604800" if target.suffix == ".png" else "no-cache"
+        return FileResponse(target, media_type=media, headers={"Cache-Control": cache})
 
     @app.get("/health")
     async def health():

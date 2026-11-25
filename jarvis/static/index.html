@@ -153,6 +153,10 @@
     </div>
     <div class="card"><div class="scroll"><table id="keyTable"></table></div></div>
     <div class="card">
+      <h2>iPhone app</h2>
+      <p class="muted">On your iPhone, open <code id="phoneUrl"></code> in Safari, sign in with a key, then tap Share → <b>Add to Home Screen</b>.</p>
+    </div>
+    <div class="card">
       <h2>Use it from any OpenAI-compatible app</h2>
       <pre id="snippet"></pre>
     </div>
@@ -209,6 +213,7 @@ async function start() {
   $("login").hidden = true; $("appRoot").hidden = false;
   const h = await (await fetch("/health")).json();
   $("status").innerHTML = h.engine ? '<span class="ok">● engine online</span>' : '<span class="err">● engine offline: is Ollama running?</span>';
+  $("phoneUrl").textContent = location.origin + "/app";
   $("snippet").textContent =
 `from openai import OpenAI
 client = OpenAI(base_url="${location.origin}/v1", api_key="jv-...")

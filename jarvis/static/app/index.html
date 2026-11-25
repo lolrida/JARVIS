@@ -1,0 +1,681 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>JARVIS</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="JARVIS">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0b111c" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f6f8fb" media="(prefers-color-scheme: light)">
+<link rel="manifest" href="/app/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/app/icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="/app/icons/icon-192.png">
+<style>
+  :root {
+    --bg: #0b111c; --surface: #121a29; --surface2: #1a2436; --text: #e6edf7; --muted: #8a97ab;
+    --line: #233047; --accent: #58c4ff; --accent-ink: #04121c; --user: #173452; --bad: #ff7a6b; --good: #5fd39a;
+    --scrim: rgba(0, 0, 0, .5); --app-h: 100dvh; --app-top: 0px;
+    --sat: env(safe-area-inset-top); --sab: env(safe-area-inset-bottom);
+  }
+  @media (prefers-color-scheme: light) {
+    :root { --bg: #f6f8fb; --surface: #ffffff; --surface2: #eef2f7; --text: #0f1724; --muted: #5b6678;
+      --line: #dde3ec; --accent: #0a7fd6; --accent-ink: #ffffff; --user: #dcecff; --bad: #c8382a; --good: #1f8a55;
+      --scrim: rgba(15, 23, 36, .35); }
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden;
+    font: 16px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; overscroll-behavior: none; }
+  button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+  input, textarea { font: inherit; font-size: 16px; color: var(--text); }
+  svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+  [hidden] { display: none !important; }
+
+  .screen { position: fixed; left: 0; right: 0; top: var(--app-top); height: var(--app-h); display: flex; flex-direction: column; }
+
+  /* onboarding */
+  #onboard { justify-content: center; padding: calc(var(--sat) + 24px) 24px calc(var(--sab) + 24px); max-width: 480px; margin: 0 auto; }
+  #onboard img { width: 84px; height: 84px; border-radius: 20px; margin-bottom: 18px; }
+  #onboard h1 { margin: 0 0 6px; font-size: 30px; letter-spacing: .06em; }
+  #onboard p { color: var(--muted); margin: 0 0 22px; }
+  .field { width: 100%; padding: 14px 16px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); outline: none; }
+  .field:focus { border-color: var(--accent); }
+  .primary { width: 100%; margin-top: 12px; padding: 14px; border-radius: 14px; background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+  .primary:disabled { opacity: .5; }
+  .hint { font-size: 13px; color: var(--muted); margin-top: 18px; }
+  .hint code { background: var(--surface2); padding: 1px 6px; border-radius: 6px; }
+  .err { color: var(--bad); font-size: 14px; min-height: 20px; margin-top: 10px; }
+
+  /* chat shell */
+  .top { display: flex; align-items: center; gap: 8px; padding: calc(var(--sat) + 6px) 10px 8px; border-bottom: 1px solid var(--line); background: var(--bg); }
+  .icon-btn { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 12px; color: var(--text); }
+  .icon-btn:active { background: var(--surface2); }
+  #modelPill { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 12px;
+    border-radius: 999px; font-weight: 600; font-size: 16px; }
+  #modelPill span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #modelPill svg { width: 16px; height: 16px; color: var(--muted); }
+  #modelPill:active { background: var(--surface2); }
+
+  #thread { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 16px 14px 8px; overscroll-behavior: contain; }
+  .empty { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 10px; color: var(--muted); }
+  .empty img { width: 64px; height: 64px; border-radius: 16px; opacity: .95; }
+  .empty h2 { margin: 6px 0 0; color: var(--text); font-size: 22px; font-weight: 600; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 14px; max-width: 420px; }
+  .chip { padding: 9px 14px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); font-size: 14px; color: var(--text); }
+
+  .msg { max-width: 720px; margin: 0 auto 14px; display: flex; flex-direction: column; }
+  .bubble { white-space: pre-wrap; word-wrap: break-word; overflow-wrap: anywhere; }
+  .msg.user { align-items: flex-end; }
+  .msg.user .bubble { background: var(--user); padding: 10px 14px; border-radius: 20px 20px 6px 20px; max-width: 85%; }
+  .msg.assistant .bubble { padding: 2px 2px; }
+  .bubble pre { background: var(--surface2); border: 1px solid var(--line); border-radius: 12px; padding: 12px; overflow-x: auto;
+    white-space: pre; font: 13px/1.5 ui-monospace, "SF Mono", Menlo, monospace; margin: 8px 0; }
+  .bubble code { font: 14px ui-monospace, "SF Mono", Menlo, monospace; background: var(--surface2); padding: 1px 5px; border-radius: 6px; }
+  .bubble pre code { background: none; padding: 0; font-size: 13px; }
+  .bubble.error { color: var(--bad); }
+  .actions { display: flex; gap: 2px; margin-top: 4px; color: var(--muted); }
+  .actions button { width: 36px; height: 34px; display: grid; place-items: center; border-radius: 10px; }
+  .actions button:active { background: var(--surface2); }
+  .actions svg { width: 18px; height: 18px; }
+  .actions .on { color: var(--accent); }
+  .typing { display: inline-flex; gap: 4px; padding: 10px 2px; }
+  .typing i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); animation: blink 1.2s infinite both; }
+  .typing i:nth-child(2) { animation-delay: .2s; } .typing i:nth-child(3) { animation-delay: .4s; }
+  @keyframes blink { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
+
+  .composer { padding: 8px 10px calc(var(--sab) + 8px); background: var(--bg); }
+  body.kbd .composer { padding-bottom: 8px; }
+  .composer-inner { max-width: 720px; margin: 0 auto; display: flex; align-items: flex-end; gap: 6px; background: var(--surface);
+    border: 1px solid var(--line); border-radius: 24px; padding: 5px; }
+  #input { flex: 1; border: 0; outline: none; background: none; resize: none; max-height: 150px; padding: 9px 6px 9px 10px; line-height: 1.35; }
+  #sendBtn { width: 38px; height: 38px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; }
+  #sendBtn:disabled { opacity: .35; }
+  #sendBtn svg { width: 20px; height: 20px; stroke-width: 2.2; }
+  #micBtn { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; color: var(--muted); }
+  #micBtn.live { color: var(--bad); background: var(--surface2); }
+
+  #installTip { margin: 0 10px 8px; padding: 10px 12px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line);
+    font-size: 14px; display: flex; gap: 10px; align-items: center; }
+  #installTip div { flex: 1; }
+  #installTip svg { width: 18px; height: 18px; vertical-align: -3px; }
+
+  /* drawer */
+  #scrim { position: fixed; inset: 0; background: var(--scrim); opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 10; }
+  #scrim.on { opacity: 1; pointer-events: auto; }
+  #drawer { position: fixed; top: 0; bottom: 0; left: 0; width: min(84vw, 340px); background: var(--surface); z-index: 11;
+    transform: translateX(-102%); transition: transform .25s ease; display: flex; flex-direction: column;
+    padding: calc(var(--sat) + 12px) 10px calc(var(--sab) + 10px); }
+  #drawer.on { transform: none; }
+  .drawer-head { display: flex; align-items: center; gap: 10px; padding: 4px 6px 12px; }
+  .drawer-head img { width: 32px; height: 32px; border-radius: 9px; }
+  .drawer-head b { flex: 1; letter-spacing: .06em; }
+  #newChatBtn2 { display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 12px; background: var(--surface2); font-weight: 600; }
+  #convoList { flex: 1; overflow-y: auto; margin: 12px 0; }
+  .convo { display: flex; align-items: center; border-radius: 12px; }
+  .convo.on { background: var(--surface2); }
+  .convo button.open { flex: 1; min-width: 0; text-align: left; padding: 11px 12px; }
+  .convo .t { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .convo .s { display: block; font-size: 12px; color: var(--muted); }
+  .convo button.del { width: 36px; height: 36px; display: grid; place-items: center; color: var(--muted); }
+  .convo button.del svg { width: 16px; height: 16px; }
+  .drawer-foot button { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px; border-radius: 12px; }
+  .drawer-foot button:active { background: var(--surface2); }
+  .section-label { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding: 14px 12px 6px; }
+
+  /* bottom sheets */
+  .sheet { position: fixed; left: 0; right: 0; bottom: 0; max-height: calc(var(--app-h) - var(--sat) - 20px); z-index: 12;
+    background: var(--surface); border-radius: 18px 18px 0 0; transform: translateY(105%); transition: transform .28s ease;
+    display: flex; flex-direction: column; max-width: 640px; margin: 0 auto; }
+  .sheet.on { transform: none; }
+  .sheet-head { display: flex; align-items: center; padding: 14px 16px 10px; border-bottom: 1px solid var(--line); }
+  .sheet-head h3 { flex: 1; margin: 0; font-size: 17px; }
+  .sheet-head button { color: var(--accent); font-weight: 600; padding: 6px; }
+  .sheet-body { overflow-y: auto; padding: 8px 16px calc(var(--sab) + 18px); }
+  .opt { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 12px 4px; border-bottom: 1px solid var(--line); }
+  .opt .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .opt .tag { font-size: 12px; color: var(--muted); }
+  .opt svg { color: var(--accent); width: 20px; height: 20px; }
+  .card { background: var(--surface2); border-radius: 14px; padding: 14px; margin: 12px 0; }
+  .card h4 { margin: 0; font-size: 17px; display: flex; align-items: center; gap: 8px; }
+  .card p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+  .pill { font-size: 12px; padding: 2px 9px; border-radius: 999px; background: var(--surface); color: var(--muted); font-weight: 500; }
+  .pill.on { background: var(--accent); color: var(--accent-ink); }
+  .vers { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+  .vers button { font-size: 13px; padding: 6px 11px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); }
+  .vers button.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .card textarea { width: 100%; min-height: 96px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); padding: 10px; outline: none; resize: vertical; }
+  .card label.check { display: flex; gap: 8px; align-items: center; font-size: 14px; color: var(--muted); margin-top: 8px; }
+  .card .primary { padding: 11px; }
+  .row-set { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 13px 2px; border-bottom: 1px solid var(--line); }
+  .row-set span:last-child { color: var(--muted); text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .switch { position: relative; width: 50px; height: 30px; border-radius: 999px; background: var(--line); transition: background .2s; flex: none; }
+  .switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: #fff; transition: transform .2s; }
+  .switch.on { background: var(--good); } .switch.on::after { transform: translateX(20px); }
+  .danger { color: var(--bad); width: 100%; text-align: left; padding: 13px 2px; border-bottom: 1px solid var(--line); }
+  .ok { color: var(--good); } .bad { color: var(--bad); }
+  .progress { height: 6px; border-radius: 999px; background: var(--line); overflow: hidden; margin-top: 10px; }
+  .progress i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+
+  #toast { position: fixed; left: 50%; bottom: calc(var(--sab) + 90px); transform: translateX(-50%) translateY(20px); opacity: 0;
+    background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-size: 14px; transition: all .2s; z-index: 20; pointer-events: none; }
+  #toast.on { opacity: 1; transform: translateX(-50%); }
+</style>
+</head>
+<body>
+
+<!-- ============ sign in ============ -->
+<div id="onboard" class="screen" hidden>
+  <img src="/app/icons/icon-192.png" alt="">
+  <h1>JARVIS</h1>
+  <p>Your own AI models, running on your own server.</p>
+  <input id="keyInput" class="field" type="password" placeholder="API key (jv-…)" autocomplete="off" autocapitalize="off" spellcheck="false">
+  <button id="connectBtn" class="primary">Connect</button>
+  <div id="loginErr" class="err"></div>
+  <div class="hint">Get a key from the JARVIS web dashboard (API keys tab), or on the server run <code>jarvis create-key --name iphone</code>. An admin key also lets you manage models from your phone.</div>
+</div>
+
+<!-- ============ chat ============ -->
+<div id="shell" class="screen" hidden>
+  <header class="top">
+    <button class="icon-btn" id="menuBtn" aria-label="Chats"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/></svg></button>
+    <button id="modelPill" aria-label="Choose model"><span id="modelName">Choose a model</span><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button>
+    <button class="icon-btn" id="newChatBtn" aria-label="New chat"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+  </header>
+  <main id="thread"></main>
+  <div id="installTip" hidden>
+    <div>Install JARVIS: tap <svg viewBox="0 0 24 24"><path d="M12 3v12M8 7l4-4 4 4"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg> Share, then <b>Add to Home Screen</b>.</div>
+    <button class="icon-btn" id="tipClose" aria-label="Dismiss"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+  </div>
+  <footer class="composer">
+    <div class="composer-inner">
+      <button id="micBtn" aria-label="Dictate" hidden><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
+      <textarea id="input" rows="1" placeholder="Message JARVIS"></textarea>
+      <button id="sendBtn" aria-label="Send" disabled></button>
+    </div>
+  </footer>
+</div>
+
+<!-- ============ drawer ============ -->
+<div id="scrim"></div>
+<aside id="drawer" aria-label="Chats">
+  <div class="drawer-head"><img src="/app/icons/icon-192.png" alt=""><b>JARVIS</b></div>
+  <button id="newChatBtn2"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>New chat</button>
+  <div id="convoList"></div>
+  <div class="drawer-foot">
+    <button id="openModels" hidden><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg>My models</button>
+    <button id="openSettings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>Settings</button>
+  </div>
+</aside>
+
+<!-- ============ sheets ============ -->
+<section class="sheet" id="modelSheet" aria-label="Choose model">
+  <div class="sheet-head"><h3>Choose model</h3><button data-close>Done</button></div>
+  <div class="sheet-body" id="modelOptions"></div>
+</section>
+
+<section class="sheet" id="modelsSheet" aria-label="My models">
+  <div class="sheet-head"><h3>My models</h3><button data-close>Done</button></div>
+  <div class="sheet-body" id="modelsBody"></div>
+</section>
+
+<section class="sheet" id="settingsSheet" aria-label="Settings">
+  <div class="sheet-head"><h3>Settings</h3><button data-close>Done</button></div>
+  <div class="sheet-body">
+    <div class="row-set"><span>Server</span><span id="setServer">…</span></div>
+    <div class="row-set"><span>Engine</span><span id="setEngine">…</span></div>
+    <div class="row-set"><span>Signed in as</span><span id="setWho">…</span></div>
+    <div class="row-set"><span>Read replies aloud</span><button class="switch" id="speakSwitch" role="switch" aria-label="Read replies aloud"></button></div>
+    <div class="row-set"><span>Creativity</span><span><input type="range" id="tempRange" min="0" max="1.5" step="0.1" style="width:130px;vertical-align:middle"> <b id="tempVal"></b></span></div>
+    <button class="danger" id="clearChats">Delete all chats on this phone</button>
+    <button class="danger" id="signOut">Sign out</button>
+    <p class="hint">Chats are stored only on this phone. Every reply comes from your own JARVIS server. Nothing goes to a third party.</p>
+  </div>
+</section>
+
+<div id="toast"></div>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const ICON = {
+  send: '<svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg>',
+  stop: '<svg viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor"/></svg>',
+  copy: '<svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></svg>',
+  speak: '<svg viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>',
+  up: '<svg viewBox="0 0 24 24"><path d="M7 10v11H4V10zM7 10l4-8a3 3 0 0 1 3 3v4h5.5a2 2 0 0 1 2 2.3l-1.4 8A2 2 0 0 1 18 21H7"/></svg>',
+  down: '<svg viewBox="0 0 24 24"><path d="M17 14V3h3v11zM17 14l-4 8a3 3 0 0 1-3-3v-4H4.5a2 2 0 0 1-2-2.3l1.4-8A2 2 0 0 1 6 3h11"/></svg>',
+  check: '<svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg>',
+  x: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+};
+
+// ---------- persistent state (this phone only) ----------
+const store = {
+  get(k, d) { try { const v = localStorage.getItem("jarvis." + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem("jarvis." + k, JSON.stringify(v)); } catch (e) { toast("Phone storage is full"); } },
+  del(k) { try { localStorage.removeItem("jarvis." + k); } catch (e) {} },
+};
+const S = {
+  key: store.get("key", null), me: null, model: store.get("model", ""),
+  convos: store.get("convos", []), current: null, speak: store.get("speak", false),
+  temp: store.get("temp", null), busy: false, controller: null,
+};
+const saveConvos = () => { S.convos = S.convos.slice(0, 60); store.set("convos", S.convos); };
+const convo = () => S.convos.find((c) => c.id === S.current);
+
+// ---------- layout: keep the composer above the iOS keyboard ----------
+function fit() {
+  const vv = window.visualViewport;
+  const h = vv ? vv.height : window.innerHeight;
+  document.documentElement.style.setProperty("--app-h", h + "px");
+  document.documentElement.style.setProperty("--app-top", (vv ? vv.offsetTop : 0) + "px");
+  document.body.classList.toggle("kbd", window.innerHeight - h > 120);
+}
+window.visualViewport?.addEventListener("resize", fit);
+window.visualViewport?.addEventListener("scroll", fit);
+window.addEventListener("resize", fit);
+fit();
+
+// ---------- api ----------
+async function api(path, opts = {}) {
+  const headers = { Authorization: "Bearer " + S.key, ...(opts.body ? { "Content-Type": "application/json" } : {}) };
+  let r;
+  try { r = await fetch(path, { ...opts, headers }); }
+  catch (e) { throw new Error("Can't reach your JARVIS server. Check you're connected."); }
+  if (r.status === 401) { signOut(); throw new Error("Your key was rejected. Sign in again."); }
+  if (!r.ok) {
+    let msg = r.statusText;
+    try { const j = await r.json(); msg = j.detail || j.error?.message || msg; } catch (e) {}
+    throw new Error(msg);
+  }
+  return r;
+}
+const getJSON = async (p) => (await api(p)).json();
+const postJSON = async (p, b) => (await api(p, { method: "POST", body: JSON.stringify(b) })).json();
+
+async function* readLines(r, sep) {
+  const reader = r.body.getReader(), dec = new TextDecoder(); let buf = "";
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    const parts = buf.split(sep); buf = parts.pop();
+    for (const p of parts) if (p.trim()) yield p;
+  }
+  if (buf.trim()) yield buf;
+}
+
+// ---------- sign in ----------
+async function connect() {
+  const key = $("keyInput").value.trim();
+  if (!key) return;
+  $("connectBtn").disabled = true; $("loginErr").textContent = "";
+  S.key = key;
+  try {
+    const r = await fetch("/api/whoami", { headers: { Authorization: "Bearer " + key } });
+    if (r.status === 401) throw new Error("That key wasn't accepted.");
+    if (!r.ok) throw new Error("Server error " + r.status);
+    store.set("key", key);
+    await boot();
+  } catch (e) {
+    S.key = null;
+    $("loginErr").textContent = e.message === "Failed to fetch" ? "Can't reach the server." : e.message;
+  }
+  $("connectBtn").disabled = false;
+}
+$("connectBtn").onclick = connect;
+$("keyInput").onkeydown = (e) => { if (e.key === "Enter") connect(); };
+
+function signOut() {
+  S.key = null; S.me = null; store.del("key");
+  closeAll(); $("shell").hidden = true; $("onboard").hidden = false; $("keyInput").value = "";
+}
+
+async function boot() {
+  S.me = await getJSON("/api/whoami");
+  $("onboard").hidden = true; $("shell").hidden = false;
+  $("openModels").hidden = !S.me.is_admin;
+  if (!S.model) {
+    try {
+      const ms = (await getJSON("/v1/models")).data;
+      const pick = ms.find((m) => m.owned_by === "you" && !m.id.includes("@")) || ms[0];
+      if (pick) setModel(pick.id);
+    } catch (e) {}
+  }
+  updateModelPill();
+  const last = S.convos[0];
+  if (last && Date.now() - last.updated < 6 * 3600e3) openConvo(last.id); else newChat();
+  const standalone = navigator.standalone || matchMedia("(display-mode: standalone)").matches;
+  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
+  $("installTip").hidden = !(ios && !standalone && !store.get("tipDismissed", false));
+}
+$("tipClose").onclick = () => { store.set("tipDismissed", true); $("installTip").hidden = true; };
+
+// ---------- model picker ----------
+function setModel(id) {
+  S.model = id; store.set("model", id);
+  const c = convo(); if (c) { c.model = id; saveConvos(); }
+  updateModelPill();
+}
+function updateModelPill() { $("modelName").textContent = (convo()?.model || S.model) || "Choose a model"; }
+
+$("modelPill").onclick = async () => {
+  openSheet("modelSheet");
+  const box = $("modelOptions"); box.innerHTML = '<p class="hint">Loading…</p>';
+  try {
+    const ms = (await getJSON("/v1/models")).data;
+    const cur = convo()?.model || S.model;
+    const group = (title, list) => !list.length ? "" : `<div class="section-label">${title}</div>` + list.map((m) =>
+      `<button class="opt" data-id="${esc(m.id)}"><span class="name">${esc(m.id)}</span>${m.id === cur ? ICON.check : ""}</button>`).join("");
+    box.innerHTML =
+      group("Your models", ms.filter((m) => m.owned_by === "you" && !m.id.includes("@"))) +
+      group("Base models", ms.filter((m) => m.owned_by === "base")) +
+      group("Pinned versions", ms.filter((m) => m.id.includes("@"))) ||
+      '<p class="hint">No models yet. Download a base model from the dashboard or the My models screen.</p>';
+    box.querySelectorAll(".opt").forEach((b) => b.onclick = () => { setModel(b.dataset.id); closeAll(); });
+  } catch (e) { box.innerHTML = `<p class="err">${esc(e.message)}</p>`; }
+};
+
+// ---------- conversations ----------
+function newChat() {
+  S.current = null; renderThread(); updateModelPill(); closeAll();
+}
+function openConvo(id) {
+  S.current = id; renderThread(); updateModelPill(); closeAll();
+}
+function renderConvoList() {
+  const list = $("convoList");
+  if (!S.convos.length) { list.innerHTML = '<p class="hint" style="padding:0 12px">No chats yet.</p>'; return; }
+  list.innerHTML = S.convos.map((c) => `<div class="convo ${c.id === S.current ? "on" : ""}">
+    <button class="open" data-id="${c.id}"><span class="t">${esc(c.title)}</span><span class="s">${esc(c.model)} · ${ago(c.updated)}</span></button>
+    <button class="del" data-id="${c.id}" aria-label="Delete chat">${ICON.x}</button></div>`).join("");
+  list.querySelectorAll(".open").forEach((b) => b.onclick = () => openConvo(b.dataset.id));
+  list.querySelectorAll(".del").forEach((b) => b.onclick = () => {
+    if (!confirm("Delete this chat?")) return;
+    S.convos = S.convos.filter((c) => c.id !== b.dataset.id); saveConvos();
+    if (S.current === b.dataset.id) { S.current = null; renderThread(); }
+    renderConvoList();
+  });
+}
+function ago(t) {
+  const s = (Date.now() - t) / 1000;
+  if (s < 60) return "now"; if (s < 3600) return Math.floor(s / 60) + "m";
+  if (s < 86400) return Math.floor(s / 3600) + "h"; return Math.floor(s / 86400) + "d";
+}
+
+// ---------- thread rendering ----------
+function md(src) {
+  // Minimal, safe markdown: ``` code blocks, `inline code`, **bold**. Everything is escaped first.
+  return String(src).split("```").map((part, i) => i % 2
+    ? `<pre><code>${esc(part.replace(/^[\w+#.-]*\n/, ""))}</code></pre>`
+    : esc(i ? part.replace(/^\n/, "") : part).replace(/`([^`\n]+)`/g, "<code>$1</code>").replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>")
+  ).join("");
+}
+
+function renderThread() {
+  const t = $("thread"), c = convo();
+  if (!c || !c.messages.length) {
+    t.innerHTML = `<div class="empty"><img src="/app/icons/icon-192.png" alt=""><h2>How can I help?</h2>
+      <div>Talking to <b>${esc(S.model || "no model selected")}</b></div>
+      <div class="chips">${["Plan my day", "Explain something simply", "Help me write a message", "Brainstorm ideas"]
+        .map((s) => `<button class="chip">${s}</button>`).join("")}</div></div>`;
+    t.querySelectorAll(".chip").forEach((b) => b.onclick = () => { $("input").value = b.textContent; onInput(); $("input").focus(); });
+    return;
+  }
+  t.innerHTML = "";
+  c.messages.forEach((m, i) => t.appendChild(msgEl(m, i)));
+  t.scrollTop = t.scrollHeight;
+}
+
+function msgEl(m, i) {
+  const el = document.createElement("div");
+  el.className = "msg " + m.role;
+  const b = document.createElement("div");
+  b.className = "bubble" + (m.error ? " error" : "");
+  if (m.role === "assistant") b.innerHTML = m.error ? esc(m.error) : md(m.content); else b.textContent = m.content;
+  el.appendChild(b);
+  if (m.role === "assistant" && !m.error && m.content) el.appendChild(actionsEl(m, i));
+  return el;
+}
+
+function actionsEl(m, i) {
+  const a = document.createElement("div"); a.className = "actions";
+  const btn = (html, label, fn, on) => {
+    const x = document.createElement("button"); x.innerHTML = html; x.setAttribute("aria-label", label);
+    if (on) x.classList.add("on"); x.onclick = fn; a.appendChild(x); return x;
+  };
+  btn(ICON.copy, "Copy", async () => {
+    try { await navigator.clipboard.writeText(m.content); toast("Copied"); } catch (e) { toast("Couldn't copy"); }
+  });
+  btn(ICON.speak, "Read aloud", () => speak(m.content));
+  btn(ICON.up, "Good reply", () => rate(i, 1), m.rated === 1);
+  btn(ICON.down, "Bad reply", () => rate(i, -1), m.rated === -1);
+  return a;
+}
+
+async function rate(i, v) {
+  const c = convo(); const m = c.messages[i];
+  if (m.rated === v) return;
+  const messages = c.messages.slice(0, i + 1).filter((x) => !x.error).map(({ role, content }) => ({ role, content }));
+  try {
+    await postJSON("/api/feedback", { model: m.model || c.model, messages, rating: v });
+    m.rated = v; saveConvos(); renderThread();
+    toast(v > 0 ? "Saved to training data" : "Noted");
+  } catch (e) { toast(e.message); }
+}
+
+// ---------- sending ----------
+const input = $("input");
+function onInput() {
+  input.style.height = "auto"; input.style.height = Math.min(input.scrollHeight, 150) + "px";
+  if (!S.busy) $("sendBtn").disabled = !input.value.trim();
+}
+input.addEventListener("input", onInput);
+input.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey && matchMedia("(pointer: fine)").matches) { e.preventDefault(); send(); }
+});
+input.addEventListener("focus", () => setTimeout(() => { window.scrollTo(0, 0); $("thread").scrollTop = $("thread").scrollHeight; }, 300));
+$("sendBtn").innerHTML = ICON.send;
+$("sendBtn").onclick = () => S.busy ? S.controller?.abort() : send();
+
+function setBusy(b) {
+  S.busy = b;
+  $("sendBtn").innerHTML = b ? ICON.stop : ICON.send;
+  $("sendBtn").setAttribute("aria-label", b ? "Stop" : "Send");
+  $("sendBtn").disabled = b ? false : !input.value.trim();
+}
+
+async function send() {
+  const text = input.value.trim();
+  const model = convo()?.model || S.model;
+  if (!text || S.busy) return;
+  if (!model) { $("modelPill").click(); return; }
+  if (S.speak) primeSpeech();
+
+  let c = convo();
+  if (!c) {
+    c = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), title: text.slice(0, 48), model, messages: [], updated: Date.now() };
+    S.convos.unshift(c); S.current = c.id;
+  }
+  c.messages.push({ role: "user", content: text });
+  const reply = { role: "assistant", content: "", model };
+  c.messages.push(reply);
+  c.updated = Date.now();
+  S.convos = [c, ...S.convos.filter((x) => x !== c)];
+  saveConvos();
+  input.value = ""; onInput(); renderThread();
+
+  const t = $("thread");
+  const bubble = t.lastElementChild.querySelector(".bubble");
+  bubble.innerHTML = '<span class="typing"><i></i><i></i><i></i></span>';
+  setBusy(true);
+  S.controller = new AbortController();
+
+  const history = c.messages.slice(0, -1).filter((m) => !m.error).map(({ role, content }) => ({ role, content }));
+  const body = { model, messages: history, stream: true };
+  if (S.temp !== null) body.temperature = S.temp;
+  let pending = false;
+  const paint = () => {
+    pending = false; bubble.innerHTML = md(reply.content);
+    const nearBottom = t.scrollHeight - t.scrollTop - t.clientHeight < 160;
+    if (nearBottom) t.scrollTop = t.scrollHeight;
+  };
+  try {
+    const r = await api("/v1/chat/completions", { method: "POST", body: JSON.stringify(body), signal: S.controller.signal });
+    for await (const ev of readLines(r, "\n\n")) {
+      const data = ev.replace(/^data: /, "");
+      if (data === "[DONE]") break;
+      const j = JSON.parse(data);
+      if (j.error) throw new Error(j.error.message);
+      reply.content += j.choices?.[0]?.delta?.content || "";
+      if (!pending) { pending = true; requestAnimationFrame(paint); }
+    }
+  } catch (e) {
+    if (e.name !== "AbortError") { if (!reply.content) reply.error = e.message; else toast(e.message); }
+  }
+  if (!reply.content && !reply.error) reply.error = "Stopped.";
+  setBusy(false); S.controller = null;
+  saveConvos(); renderThread();
+  if (S.speak && reply.content && !reply.error) speak(reply.content);
+}
+
+// ---------- voice ----------
+function plain(t) { return t.replace(/```[\s\S]*?```/g, " (code) ").replace(/[*`#_>]/g, ""); }
+function primeSpeech() { try { speechSynthesis.speak(new SpeechSynthesisUtterance("")); } catch (e) {} }
+function speak(text) {
+  if (!("speechSynthesis" in window)) return toast("Speech isn't available here");
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(plain(text));
+  u.lang = navigator.language || "en-US";
+  speechSynthesis.speak(u);
+}
+const Rec = window.SpeechRecognition || window.webkitSpeechRecognition;
+if (Rec) {
+  let rec = null;
+  $("micBtn").hidden = false;
+  $("micBtn").onclick = () => {
+    if (rec) { rec.stop(); return; }
+    rec = new Rec(); rec.lang = navigator.language || "en-US"; rec.interimResults = true; rec.continuous = false;
+    const before = input.value ? input.value.trimEnd() + " " : "";
+    rec.onresult = (e) => { input.value = before + Array.from(e.results).map((r) => r[0].transcript).join(""); onInput(); };
+    rec.onerror = (e) => { if (e.error !== "aborted" && e.error !== "no-speech") toast("Dictation unavailable: " + e.error); };
+    rec.onend = () => { rec = null; $("micBtn").classList.remove("live"); };
+    $("micBtn").classList.add("live");
+    try { rec.start(); } catch (e) { rec = null; $("micBtn").classList.remove("live"); }
+  };
+}
+
+// ---------- drawer & sheets ----------
+function openDrawer() { renderConvoList(); $("drawer").classList.add("on"); $("scrim").classList.add("on"); input.blur(); }
+function openSheet(id) { closeAll(); $(id).classList.add("on"); $("scrim").classList.add("on"); input.blur(); }
+function closeAll() {
+  document.querySelectorAll(".sheet.on, #drawer.on").forEach((e) => e.classList.remove("on"));
+  $("scrim").classList.remove("on");
+}
+$("menuBtn").onclick = openDrawer;
+$("scrim").onclick = closeAll;
+document.querySelectorAll("[data-close]").forEach((b) => b.onclick = closeAll);
+$("newChatBtn").onclick = newChat;
+$("newChatBtn2").onclick = newChat;
+// swipe the drawer closed
+(() => { let x0 = null; const d = $("drawer");
+  d.addEventListener("touchstart", (e) => { x0 = e.touches[0].clientX; }, { passive: true });
+  d.addEventListener("touchend", (e) => { if (x0 !== null && x0 - e.changedTouches[0].clientX > 60) closeAll(); x0 = null; });
+})();
+
+// ---------- settings ----------
+$("openSettings").onclick = async () => {
+  openSheet("settingsSheet");
+  $("setServer").textContent = location.host;
+  $("setWho").textContent = `${S.me?.name || "?"} (${S.me?.is_admin ? "admin" : "user"})`;
+  $("speakSwitch").classList.toggle("on", S.speak);
+  $("tempRange").value = S.temp ?? 0.7; $("tempVal").textContent = S.temp === null ? "default" : S.temp;
+  $("setEngine").innerHTML = "…";
+  try {
+    const h = await (await fetch("/health")).json();
+    $("setEngine").innerHTML = h.engine ? '<span class="ok">online</span>' : '<span class="bad">offline</span>';
+  } catch (e) { $("setEngine").innerHTML = '<span class="bad">unreachable</span>'; }
+};
+$("speakSwitch").onclick = () => { S.speak = !S.speak; store.set("speak", S.speak); $("speakSwitch").classList.toggle("on", S.speak); if (S.speak) primeSpeech(); };
+$("tempRange").oninput = (e) => { S.temp = parseFloat(e.target.value); store.set("temp", S.temp); $("tempVal").textContent = S.temp; };
+$("clearChats").onclick = () => { if (confirm("Delete every chat stored on this phone?")) { S.convos = []; saveConvos(); newChat(); } };
+$("signOut").onclick = () => { if (confirm("Sign out of JARVIS on this phone?")) signOut(); };
+
+// ---------- my models (admin) ----------
+$("openModels").onclick = () => { openSheet("modelsSheet"); loadModels(); };
+
+async function loadModels() {
+  const box = $("modelsBody");
+  box.innerHTML = '<p class="hint">Loading…</p>';
+  try {
+    const d = await getJSON("/api/models");
+    const cards = d.custom.map((m) => {
+      const cur = m.versions.find((v) => v.version === m.active_version) || {};
+      return `<div class="card" data-name="${esc(m.name)}">
+        <h4>${esc(m.name)} <span class="pill on">v${m.active_version}</span></h4>
+        <p>${esc(m.description || (cur.gguf_digest ? "custom weights" : "built on " + (cur.base || "?")))}</p>
+        <div class="vers">${m.versions.map((v) =>
+          `<button data-v="${v.version}" class="${v.version === m.active_version ? "on" : ""}">v${v.version}${v.notes ? " · " + esc(v.notes.slice(0, 18)) : ""}</button>`).join("")}</div>
+        <textarea placeholder="Personality / system prompt">${esc(cur.system || "")}</textarea>
+        <label class="check"><input type="checkbox"> Teach it my 👍 replies</label>
+        <button class="primary">Save as v${(m.versions.at(-1)?.version || 0) + 1}</button>
+      </div>`;
+    }).join("");
+    box.innerHTML = (cards || '<p class="hint">No custom models yet. Create one from the dashboard on your computer.</p>') +
+      `<div class="section-label">Download a base model</div>
+       <div class="card"><input class="field" id="pullName" placeholder="e.g. llama3.2:3b" autocapitalize="off" spellcheck="false">
+       <button class="primary" id="pullBtn">Download to server</button>
+       <div class="progress" id="pullBar" hidden><i></i></div><p id="pullMsg"></p></div>`;
+
+    box.querySelectorAll(".card[data-name]").forEach((card) => {
+      const name = card.dataset.name;
+      card.querySelectorAll(".vers button").forEach((b) => b.onclick = async () => {
+        if (b.classList.contains("on")) return;
+        try { await postJSON(`/api/models/${name}/activate`, { version: +b.dataset.v }); toast(`${name} now on v${b.dataset.v}`); loadModels(); }
+        catch (e) { toast(e.message); }
+      });
+      card.querySelector(".primary").onclick = async (ev) => {
+        const btn = ev.target; btn.disabled = true; btn.textContent = "Building…";
+        const body = { system: card.querySelector("textarea").value, notes: "from iPhone" };
+        if (card.querySelector("input[type=checkbox]").checked) body.examples_from_feedback = 20;
+        try { const v = await postJSON(`/api/models/${name}/versions`, body); toast(`v${v.version} is live`); loadModels(); }
+        catch (e) { toast(e.message); btn.disabled = false; btn.textContent = "Try again"; }
+      };
+    });
+    $("pullBtn").onclick = pullModel;
+  } catch (e) { box.innerHTML = `<p class="err">${esc(e.message)}</p>`; }
+}
+
+async function pullModel() {
+  const name = $("pullName").value.trim(); if (!name) return;
+  const bar = $("pullBar"), msg = $("pullMsg");
+  $("pullBtn").disabled = true; bar.hidden = false; bar.firstElementChild.style.width = "0"; msg.textContent = "Starting…";
+  try {
+    const r = await api("/api/base-models/pull", { method: "POST", body: JSON.stringify({ model: name }) });
+    for await (const line of readLines(r, "\n")) {
+      const p = JSON.parse(line);
+      if (p.error) throw new Error(p.error);
+      if (p.total) bar.firstElementChild.style.width = (100 * (p.completed || 0) / p.total).toFixed(1) + "%";
+      msg.textContent = p.status;
+    }
+    msg.innerHTML = `<span class="ok">${esc(name)} is ready</span>`; bar.firstElementChild.style.width = "100%";
+  } catch (e) { msg.innerHTML = `<span class="bad">${esc(e.message)}</span>`; }
+  $("pullBtn").disabled = false;
+}
+
+// ---------- misc ----------
+let toastTimer;
+function toast(text) {
+  const t = $("toast"); t.textContent = text; t.classList.add("on");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("on"), 2200);
+}
+
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("/app/sw.js", { scope: "/app/" }).catch(() => {});
+
+if (S.key) boot().catch(() => { if (S.key) { $("onboard").hidden = false; $("loginErr").textContent = "Can't reach your JARVIS server right now."; } });
+else $("onboard").hidden = false;
+</script>
+</body>
+</html>

@@ -23,4 +23,4 @@ jarvis = "jarvis.cli:main"
 packages = ["jarvis"]
 
 [tool.setuptools.package-data]
-jarvis = ["static/*"]
+jarvis = ["static/*", "static/app/*", "static/app/icons/*"]

@@ -211,3 +211,19 @@ def test_embeddings(ctx):
     c, _ = ctx
     r = c.post("/v1/embeddings", json={"model": "llama3.2:3b", "input": ["a", "b"]})
     assert r.status_code == 200 and len(r.json()["data"]) == 2
+
+
+def test_mobile_app_is_served(ctx):
+    c, _ = ctx
+    c.headers.pop("Authorization")  # the app shell is public; its API calls need a key
+    assert c.get("/app", follow_redirects=False).headers["location"] == "/app/"
+    r = c.get("/app/")
+    assert r.status_code == 200 and "apple-mobile-web-app-capable" in r.text
+    m = c.get("/app/manifest.webmanifest")
+    assert m.headers["content-type"].startswith("application/manifest+json")
+    assert m.json()["display"] == "standalone"
+    assert c.get("/app/sw.js").headers["content-type"].startswith("text/javascript")
+    assert c.get("/app/icons/apple-touch-icon.png").content[:4] == b"\x89PNG"
+    assert c.get("/app/../app.py").status_code == 404
+    assert c.get("/app/%2e%2e/app.py").status_code == 404
+    assert c.get("/app/nope.js").status_code == 404
