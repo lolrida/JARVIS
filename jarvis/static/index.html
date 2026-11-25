@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JARVIS</title>
+<style>
+  :root {
+    --bg: #f7f7f5; --panel: #ffffff; --text: #1d1d1b; --muted: #6b6b66; --line: #e3e2dd;
+    --accent: #2f6fdb; --accent-text: #fff; --bad: #c2412d; --good: #2c8a4b; --code: #f0efea;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #151514; --panel: #1e1e1c; --text: #ecebe6; --muted: #9b9a93; --line: #33332f;
+      --accent: #6b9cf0; --accent-text: #0e1420; --bad: #ef7a64; --good: #6cc68b; --code: #2a2a27; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, sans-serif; }
+  header { display: flex; align-items: center; gap: 16px; padding: 12px 20px; border-bottom: 1px solid var(--line);
+    background: var(--panel); flex-wrap: wrap; }
+  header h1 { font-size: 18px; margin: 0; letter-spacing: .08em; }
+  nav { display: flex; gap: 4px; flex-wrap: wrap; }
+  nav button { background: none; color: var(--muted); border: 0; padding: 6px 12px; border-radius: 6px; cursor: pointer; font: inherit; }
+  nav button.on { background: var(--code); color: var(--text); }
+  #status { margin-left: auto; font-size: 13px; color: var(--muted); }
+  main { max-width: 980px; margin: 0 auto; padding: 20px 16px; }
+  section { display: none; } section.on { display: block; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+  h2 { font-size: 16px; margin: 0 0 12px; }
+  label { display: block; font-size: 13px; color: var(--muted); margin: 10px 0 4px; }
+  input, textarea, select { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px;
+    background: var(--bg); color: var(--text); font: inherit; }
+  textarea { min-height: 80px; resize: vertical; font-family: ui-monospace, monospace; font-size: 13px; }
+  button.btn { background: var(--accent); color: var(--accent-text); border: 0; padding: 8px 14px; border-radius: 6px;
+    cursor: pointer; font: inherit; margin-top: 10px; }
+  button.ghost { background: none; color: var(--text); border: 1px solid var(--line); padding: 4px 10px; border-radius: 6px;
+    cursor: pointer; font: inherit; font-size: 13px; }
+  button.danger { color: var(--bad); }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; }
+  .row > * { flex: 1 1 180px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 500; font-size: 13px; }
+  .scroll { overflow-x: auto; }
+  code, .mono { font-family: ui-monospace, monospace; font-size: 13px; background: var(--code); padding: 1px 5px; border-radius: 4px; }
+  .muted { color: var(--muted); font-size: 13px; }
+  .pill { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 99px; background: var(--code); }
+  .pill.active { background: var(--accent); color: var(--accent-text); }
+  #log { height: 52vh; overflow-y: auto; padding: 4px; }
+  .msg { margin: 10px 0; padding: 10px 12px; border-radius: 8px; white-space: pre-wrap; word-wrap: break-word; }
+  .msg.user { background: var(--code); margin-left: 15%; }
+  .msg.assistant { border: 1px solid var(--line); margin-right: 15%; }
+  .msg .rate { margin-top: 6px; display: flex; gap: 6px; }
+  .err { color: var(--bad); white-space: pre-wrap; }
+  .ok { color: var(--good); }
+  #login { max-width: 420px; margin: 12vh auto; }
+  pre { white-space: pre-wrap; background: var(--code); padding: 8px; border-radius: 6px; font-size: 12px; max-height: 200px; overflow: auto; }
+</style>
+</head>
+<body>
+<div id="login" class="card" hidden>
+  <h2>JARVIS</h2>
+  <p class="muted">Paste your admin API key. On first start it's printed in the server log and saved to <code>data/admin_key.txt</code>.</p>
+  <input id="keyInput" type="password" placeholder="jv-..." autocomplete="off">
+  <button class="btn" onclick="login()">Sign in</button>
+  <p id="loginErr" class="err"></p>
+</div>
+
+<div id="appRoot" hidden>
+<header>
+  <h1>JARVIS</h1>
+  <nav id="tabs">
+    <button data-t="chat" class="on">Chat</button>
+    <button data-t="models">My models</button>
+    <button data-t="base">Base models</button>
+    <button data-t="keys">API keys</button>
+    <button data-t="usage">Usage</button>
+  </nav>
+  <span id="status"></span>
+  <button class="ghost" onclick="logout()">Sign out</button>
+</header>
+<main>
+  <section id="chat" class="on">
+    <div class="card">
+      <div class="row">
+        <div><label>Model</label><select id="chatModel"></select></div>
+        <div><label>System prompt override (optional)</label><input id="chatSystem" placeholder="Leave blank to use the model's own"></div>
+        <div style="flex:0 0 120px"><label>Temperature</label><input id="chatTemp" type="number" step="0.1" min="0" max="2" placeholder="default"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div id="log"></div>
+      <div class="row">
+        <textarea id="chatInput" style="min-height:60px" placeholder="Message… (Enter to send, Shift+Enter for newline)"></textarea>
+      </div>
+      <div class="row" style="flex-wrap:nowrap">
+        <button class="btn" id="sendBtn" onclick="send()" style="flex:0 0 auto">Send</button>
+        <button class="ghost" onclick="resetChat()" style="flex:0 0 auto;margin-top:10px">New chat</button>
+      </div>
+      <p class="muted">Thumbs up a good reply to save it to the model's dataset. Use it to train the next version.</p>
+    </div>
+  </section>
+
+  <section id="models">
+    <div class="card">
+      <h2>Create a custom model</h2>
+      <div class="row">
+        <div><label>Name</label><input id="mName" placeholder="my-assistant"></div>
+        <div><label>Base model</label><input id="mBase" list="baseList" placeholder="llama3.2:3b"></div>
+      </div>
+      <datalist id="baseList"></datalist>
+      <label>Description</label><input id="mDesc">
+      <label>System prompt (its personality and rules)</label><textarea id="mSystem" placeholder="You are JARVIS, a concise, witty assistant..."></textarea>
+      <label>Parameters (JSON)</label><input id="mParams" class="mono" value='{"temperature": 0.7}'>
+      <button class="btn" onclick="createModel()">Create</button>
+      <p id="mOut"></p>
+    </div>
+    <div id="modelList"></div>
+    <div class="card">
+      <h2>Import a traded model</h2>
+      <p class="muted">Load a <code>.jarvis.json</code> bundle someone exported. Missing base models download automatically.</p>
+      <div class="row">
+        <div><input type="file" id="impFile" accept=".json"></div>
+        <div><input id="impName" placeholder="Save as (optional)"></div>
+      </div>
+      <button class="btn" onclick="importModel()">Import</button>
+      <p id="impOut"></p>
+    </div>
+  </section>
+
+  <section id="base">
+    <div class="card">
+      <h2>Download an open-weight model</h2>
+      <p class="muted">Any model from <a href="https://ollama.com/library" target="_blank" rel="noopener">ollama.com/library</a>.
+        Rough guide: 1–4B fits 8 GB RAM, 7–8B needs 16 GB, 14B+ wants a GPU.</p>
+      <div class="row">
+        <div><input id="pullName" placeholder="llama3.2:3b, qwen2.5:7b, mistral, gemma2:2b..."></div>
+        <div style="flex:0 0 auto"><button class="btn" style="margin:0" onclick="pull()">Download</button></div>
+      </div>
+      <pre id="pullOut" hidden></pre>
+    </div>
+    <div class="card"><h2>Installed</h2><div class="scroll"><table id="baseTable"></table></div></div>
+  </section>
+
+  <section id="keys">
+    <div class="card">
+      <h2>New API key</h2>
+      <div class="row">
+        <div><input id="kName" placeholder="name, e.g. my-phone-app"></div>
+        <div style="flex:0 0 auto"><label style="margin:0"><input type="checkbox" id="kAdmin" style="width:auto"> admin</label></div>
+        <div style="flex:0 0 auto"><button class="btn" style="margin:0" onclick="createKey()">Create</button></div>
+      </div>
+      <p id="kOut"></p>
+    </div>
+    <div class="card"><div class="scroll"><table id="keyTable"></table></div></div>
+    <div class="card">
+      <h2>Use it from any OpenAI-compatible app</h2>
+      <pre id="snippet"></pre>
+    </div>
+  </section>
+
+  <section id="usage">
+    <div class="card"><h2>Last 30 days</h2><div class="scroll"><table id="usageTable"></table></div></div>
+  </section>
+</main>
+</div>
+
+<script>
+let KEY = null;
+try { KEY = localStorage.getItem("jarvisKey"); } catch (e) {}
+let history = [];
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+async function api(path, opts = {}) {
+  const r = await fetch(path, { ...opts, headers: { "Authorization": "Bearer " + KEY,
+    ...(opts.body && typeof opts.body === "string" ? { "Content-Type": "application/json" } : {}), ...(opts.headers || {}) } });
+  if (r.status === 401) { logout(); throw new Error("Not signed in"); }
+  if (!r.ok) {
+    let msg = r.statusText;
+    try { const j = await r.json(); msg = j.detail || j.error?.message || JSON.stringify(j); } catch (e) {}
+    throw new Error(msg);
+  }
+  return r;
+}
+const getJSON = async (p) => (await api(p)).json();
+const postJSON = async (p, body, method = "POST") => (await api(p, { method, body: JSON.stringify(body) })).json();
+
+async function login() {
+  KEY = $("keyInput").value.trim();
+  try {
+    const me = await getJSON("/api/whoami");
+    if (!me.is_admin) throw new Error("This web UI needs an admin key.");
+    try { localStorage.setItem("jarvisKey", KEY); } catch (e) {}
+    start();
+  } catch (e) { $("loginErr").textContent = e.message; }
+}
+function logout() {
+  KEY = null; try { localStorage.removeItem("jarvisKey"); } catch (e) {}
+  $("appRoot").hidden = true; $("login").hidden = false;
+}
+
+document.querySelectorAll("#tabs button").forEach((b) => b.onclick = () => {
+  document.querySelectorAll("#tabs button").forEach((x) => x.classList.toggle("on", x === b));
+  document.querySelectorAll("section").forEach((s) => s.classList.toggle("on", s.id === b.dataset.t));
+  ({ models: loadModels, base: loadModels, keys: loadKeys, usage: loadUsage })[b.dataset.t]?.();
+});
+
+async function start() {
+  $("login").hidden = true; $("appRoot").hidden = false;
+  const h = await (await fetch("/health")).json();
+  $("status").innerHTML = h.engine ? '<span class="ok">● engine online</span>' : '<span class="err">● engine offline: is Ollama running?</span>';
+  $("snippet").textContent =
+`from openai import OpenAI
+client = OpenAI(base_url="${location.origin}/v1", api_key="jv-...")
+r = client.chat.completions.create(
+    model="my-assistant",          # your model; or my-assistant@v2, or a base model
+    messages=[{"role": "user", "content": "Hello JARVIS"}],
+)
+print(r.choices[0].message.content)`;
+  await loadModels();
+}
+
+// ---------- chat ----------
+function resetChat() { history = []; $("log").innerHTML = ""; }
+function addMsg(role, text) {
+  const d = document.createElement("div"); d.className = "msg " + role; d.textContent = text;
+  $("log").appendChild(d); $("log").scrollTop = $("log").scrollHeight; return d;
+}
+$("chatInput").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } });
+
+async function send() {
+  const text = $("chatInput").value.trim(); const model = $("chatModel").value;
+  if (!text || !model) return;
+  $("chatInput").value = ""; $("sendBtn").disabled = true;
+  history.push({ role: "user", content: text }); addMsg("user", text);
+  const out = addMsg("assistant", "…");
+  const msgs = $("chatSystem").value.trim() ? [{ role: "system", content: $("chatSystem").value.trim() }, ...history] : history;
+  const body = { model, messages: msgs, stream: true };
+  if ($("chatTemp").value !== "") body.temperature = parseFloat($("chatTemp").value);
+  let reply = "";
+  try {
+    const r = await api("/v1/chat/completions", { method: "POST", body: JSON.stringify(body) });
+    const reader = r.body.getReader(); const dec = new TextDecoder(); let buf = "";
+    while (true) {
+      const { value, done } = await reader.read(); if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const parts = buf.split("\n\n"); buf = parts.pop();
+      for (const p of parts) {
+        const data = p.replace(/^data: /, "");
+        if (data === "[DONE]") continue;
+        const j = JSON.parse(data);
+        if (j.error) throw new Error(j.error.message);
+        reply += j.choices[0].delta.content || ""; out.textContent = reply;
+        $("log").scrollTop = $("log").scrollHeight;
+      }
+    }
+    history.push({ role: "assistant", content: reply });
+    const convo = history.slice();
+    const rate = document.createElement("div"); rate.className = "rate";
+    for (const [label, v] of [["👍", 1], ["👎", -1]]) {
+      const b = document.createElement("button"); b.className = "ghost"; b.textContent = label;
+      b.onclick = async () => { await postJSON("/api/feedback", { model, messages: convo, rating: v }); rate.innerHTML = '<span class="muted">saved</span>'; };
+      rate.appendChild(b);
+    }
+    out.appendChild(rate);
+  } catch (e) { out.innerHTML = '<span class="err">' + esc(e.message) + "</span>"; history.pop(); }
+  $("sendBtn").disabled = false;
+}
+
+// ---------- models ----------
+async function loadModels() {
+  const d = await getJSON("/api/models");
+  const sel = $("chatModel"), prev = sel.value;
+  sel.innerHTML = d.custom.map((m) => `<option value="${esc(m.name)}">${esc(m.name)} (v${m.active_version})</option>`).join("") +
+    d.base.map((b) => `<option value="${esc(b.name)}">${esc(b.name)} (base)</option>`).join("");
+  if (prev) sel.value = prev;
+  $("baseList").innerHTML = d.base.map((b) => `<option value="${esc(b.name)}">`).join("") +
+    d.custom.map((m) => `<option value="${esc(m.name)}">`).join("");
+  $("baseTable").innerHTML = "<tr><th>Model</th><th>Size</th><th>Params</th><th></th></tr>" + (d.base.length ? d.base.map((b) =>
+    `<tr><td><code>${esc(b.name)}</code></td><td>${(b.size / 1e9).toFixed(1)} GB</td><td>${esc(b.details?.parameter_size || "")}</td>
+     <td><button class="ghost danger" onclick="delBase('${esc(b.name)}')">Delete</button></td></tr>`).join("")
+    : '<tr><td colspan="4" class="muted">None yet. Download one above to get started.</td></tr>');
+  $("modelList").innerHTML = d.custom.map(modelCard).join("");
+}
+
+function modelCard(m) {
+  const rows = m.versions.slice().reverse().map((v) => `<tr>
+    <td><span class="pill ${v.version === m.active_version ? "active" : ""}">v${v.version}</span></td>
+    <td><code>${esc(v.gguf_digest ? "custom weights" : v.base)}</code></td>
+    <td>${esc((v.system || "").slice(0, 120))}${(v.system || "").length > 120 ? "…" : ""}
+      ${v.examples.length ? `<div class="muted">${v.examples.length} example messages</div>` : ""}
+      ${v.notes ? `<div class="muted">${esc(v.notes)}</div>` : ""}</td>
+    <td style="white-space:nowrap">${v.version === m.active_version ? "" :
+      `<button class="ghost" onclick="activate('${m.name}',${v.version})">Activate</button>
+       <button class="ghost danger" onclick="delVersion('${m.name}',${v.version})">✕</button>`}</td></tr>`).join("");
+  const cur = m.versions.find((v) => v.version === m.active_version) || {};
+  return `<div class="card">
+    <div class="row" style="align-items:center"><h2 style="margin:0">${esc(m.name)}</h2>
+      <div style="flex:0 0 auto;display:flex;gap:6px">
+        <button class="ghost" onclick="exportModel('${m.name}')">Export</button>
+        <a class="ghost" style="text-decoration:none;padding:4px 10px;border:1px solid var(--line);border-radius:6px;font-size:13px;color:var(--text)"
+           href="#" onclick="dl('/api/models/${m.name}/dataset','${m.name}.jsonl');return false">Dataset</a>
+        <button class="ghost danger" onclick="delModel('${m.name}')">Delete</button></div></div>
+    <p class="muted">${esc(m.description)}</p>
+    <div class="scroll"><table><tr><th>Ver</th><th>Base</th><th>System prompt</th><th></th></tr>${rows}</table></div>
+    <details style="margin-top:12px"><summary>New version</summary>
+      <p class="muted">Anything you leave unchanged is inherited from the active version.</p>
+      <label>Base model</label><input id="nb-${m.name}" data-cur="${esc(cur.gguf_digest ? "" : cur.base || "")}" list="baseList" value="${esc(cur.gguf_digest ? "" : cur.base || "")}" placeholder="${cur.gguf_digest ? "custom weights (keep)" : ""}">
+      <label>System prompt</label><textarea id="ns-${m.name}">${esc(cur.system || "")}</textarea>
+      <label>Parameters (JSON)</label><input class="mono" id="np-${m.name}" value='${esc(JSON.stringify(cur.parameters || {}))}'>
+      <label>Notes (what changed)</label><input id="nn-${m.name}">
+      <label><input type="checkbox" id="nf-${m.name}" style="width:auto"> Add my 👍 conversations as built-in examples</label>
+      <button class="btn" onclick="newVersion('${m.name}')">Build version</button>
+      <p id="nout-${m.name}"></p>
+    </details>
+  </div>`;
+}
+
+function parseParams(s) { try { return JSON.parse(s || "{}"); } catch (e) { throw new Error("Parameters must be valid JSON"); } }
+
+async function createModel() {
+  $("mOut").className = "muted"; $("mOut").textContent = "Building…";
+  try {
+    await postJSON("/api/models", { name: $("mName").value.trim(), base: $("mBase").value.trim(), description: $("mDesc").value,
+      system: $("mSystem").value, parameters: parseParams($("mParams").value) });
+    await loadModels();
+    $("mOut").className = "ok"; $("mOut").textContent = "Created. It's live in Chat and on the API.";
+  } catch (e) { $("mOut").className = "err"; $("mOut").textContent = e.message; }
+}
+
+async function newVersion(name) {
+  const out = $("nout-" + name); out.className = "muted"; out.textContent = "Building…";
+  try {
+    const base = $("nb-" + name).value.trim();
+    const body = { system: $("ns-" + name).value, parameters: parseParams($("np-" + name).value), notes: $("nn-" + name).value };
+    if (base && base !== $("nb-" + name).dataset.cur) body.base = base;
+    if ($("nf-" + name).checked) body.examples_from_feedback = 20;
+    const v = await postJSON(`/api/models/${name}/versions`, body);
+    await loadModels();
+    const out2 = $("nout-" + name); out2.className = "ok"; out2.textContent = `v${v.version} is live.`;
+  } catch (e) { out.className = "err"; out.textContent = e.message; }
+}
+
+async function activate(name, v) { await postJSON(`/api/models/${name}/activate`, { version: v }); loadModels(); }
+async function delVersion(name, v) { if (confirm(`Delete ${name} v${v}?`)) { await api(`/api/models/${name}/versions/${v}`, { method: "DELETE" }); loadModels(); } }
+async function delModel(name) { if (confirm(`Delete ${name} and all its versions?`)) { await api(`/api/models/${name}`, { method: "DELETE" }); loadModels(); } }
+async function delBase(name) { if (confirm(`Delete base model ${name}?`)) { await api(`/api/base-models/${encodeURIComponent(name)}`, { method: "DELETE" }); loadModels(); } }
+
+async function dl(path, filename) {
+  const blob = await (await api(path)).blob();
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = filename; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+const exportModel = (name) => dl(`/api/models/${name}/export`, `${name}.jarvis.json`);
+
+async function importModel() {
+  const f = $("impFile").files[0]; if (!f) return;
+  $("impOut").className = "muted"; $("impOut").textContent = "Importing (downloading base models if needed)…";
+  try {
+    const body = { bundle: JSON.parse(await f.text()) };
+    if ($("impName").value.trim()) body.as_name = $("impName").value.trim();
+    const m = await postJSON("/api/models/import", body);
+    $("impOut").className = "ok"; $("impOut").textContent = `Imported ${m.name} with ${m.versions.length} version(s).`;
+    loadModels();
+  } catch (e) { $("impOut").className = "err"; $("impOut").textContent = e.message; }
+}
+
+async function pull() {
+  const model = $("pullName").value.trim(); if (!model) return;
+  const out = $("pullOut"); out.hidden = false; out.textContent = "Starting…";
+  try {
+    const r = await api("/api/base-models/pull", { method: "POST", body: JSON.stringify({ model }) });
+    const reader = r.body.getReader(); const dec = new TextDecoder(); let buf = "";
+    while (true) {
+      const { value, done } = await reader.read(); if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split("\n"); buf = lines.pop();
+      for (const l of lines) {
+        if (!l) continue; const p = JSON.parse(l);
+        if (p.error) throw new Error(p.error);
+        out.textContent = p.total ? `${p.status}: ${(100 * (p.completed || 0) / p.total).toFixed(1)}%` : p.status;
+      }
+    }
+    loadModels();
+  } catch (e) { out.textContent = "Error: " + e.message; }
+}
+
+// ---------- keys & usage ----------
+async function loadKeys() {
+  const ks = await getJSON("/api/keys");
+  $("keyTable").innerHTML = "<tr><th>ID</th><th>Name</th><th>Key</th><th>Role</th><th>Status</th><th></th></tr>" + ks.map((k) =>
+    `<tr><td>${k.id}</td><td>${esc(k.name)}</td><td><code>${esc(k.prefix)}…</code></td><td>${k.is_admin ? "admin" : "user"}</td>
+     <td>${k.revoked ? '<span class="err">revoked</span>' : "active"}</td>
+     <td>${k.revoked ? "" : `<button class="ghost danger" onclick="revoke(${k.id})">Revoke</button>`}</td></tr>`).join("");
+}
+async function createKey() {
+  try {
+    const k = await postJSON("/api/keys", { name: $("kName").value.trim(), is_admin: $("kAdmin").checked });
+    $("kOut").innerHTML = `Copy it now. It won't be shown again:<br><code>${esc(k.key)}</code>`; loadKeys();
+  } catch (e) { $("kOut").innerHTML = `<span class="err">${esc(e.message)}</span>`; }
+}
+async function revoke(id) {
+  if (!confirm("Revoke this key?")) return;
+  try { await api(`/api/keys/${id}`, { method: "DELETE" }); loadKeys(); } catch (e) { alert(e.message); }
+}
+async function loadUsage() {
+  const u = await getJSON("/api/usage?days=30");
+  $("usageTable").innerHTML = "<tr><th>Model</th><th>Requests</th><th>Prompt tokens</th><th>Output tokens</th><th>Avg latency</th></tr>" +
+    (u.length ? u.map((r) => `<tr><td><code>${esc(r.model)}</code></td><td>${r.requests}</td><td>${r.prompt_tokens}</td>
+      <td>${r.completion_tokens}</td><td>${r.avg_latency_ms} ms</td></tr>`).join("") : '<tr><td colspan="5" class="muted">No requests yet.</td></tr>');
+}
+
+if (KEY) getJSON("/api/whoami").then((me) => me.is_admin ? start() : logout()).catch(logout); else logout();
+</script>
+</body>
+</html>

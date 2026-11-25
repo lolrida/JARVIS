@@ -1,0 +1,34 @@
+# One command, runs 24/7, restarts after crashes and reboots:
+#   docker compose up -d
+services:
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    volumes:
+      - ollama:/root/.ollama
+    # NVIDIA GPU? Install the NVIDIA Container Toolkit and uncomment:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+  jarvis:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      - ollama
+    environment:
+      OLLAMA_URL: http://ollama:11434
+      # Optional: fix your admin key instead of generating one.
+      # JARVIS_ADMIN_KEY: jv-change-me-to-something-long-and-random
+    ports:
+      - "8000:8000"
+    volumes:
+      - jarvis-data:/data
+
+volumes:
+  ollama:
+  jarvis-data:
